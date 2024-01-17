@@ -4,7 +4,7 @@ from .serializers import MenuItemSerializers
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from rest_framework import status
-
+from django.core.paginator import EmptyPage, Paginator
 
 def search_queryset(request, queryset):
     search = request.query_params.get('search')
@@ -34,9 +34,21 @@ def filter_queryset(request, queryset):
 
 
 def ordering(request, queryset): 
-    ordering = request.query_params.get('ordering', 'title')
-    queryset = queryset.order_by(ordering)
+    order = request.query_params.get('ordering', 'title')
+    order = order.split(',') if ',' in order else [order]
+    queryset = queryset.order_by(*order)
     return queryset
+
+
+def paging(request, queryset):
+    perpage = request.query_params.get('perpage', default=2) 
+    page =  request.query_params.get('page', default=1) 
+    paginator = Paginator(queryset, per_page=perpage)
+    try: 
+        queryset = paginator.page(number=page)
+    except EmptyPage:
+        queryset = []
+    return queryset 
 
 
 def menu_items_get(request): 
@@ -44,6 +56,7 @@ def menu_items_get(request):
     queryset = filter_queryset(request, queryset)
     queryset = ordering(request, queryset)
     queryset = search_queryset(request, queryset)
+    queryset = paging(request, queryset)
     serializer = MenuItemSerializers(queryset, many=True)
     return Response(serializer.data)
 
